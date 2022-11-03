@@ -245,7 +245,11 @@ class VIMAEnvBase(gym.Env):
         """
         return self.prompt, self.prompt_assets
 
-    def reset(self, workspace_only=False):
+    def set_prompt_and_assets(self, prompt, assets):
+        self.prompt = prompt
+        self.prompt_assets = assets
+
+    def reset(self, prompt=None, workspace_only=False):
         """Performs common reset functionality for all supported tasks."""
         if not self.task:
             raise ValueError(
@@ -327,7 +331,10 @@ class VIMAEnvBase(gym.Env):
             )
 
         # generate prompt and corresponding assets
-        self.prompt, self.prompt_assets = self.task.generate_prompt()
+        if prompt is not None:  # specify a given prompt
+            self.prompt, self.prompt_assets = self.task.generate_prompt(prompt)
+        else:  # randomly generate prompt in task
+            self.prompt, self.prompt_assets = self.task.generate_prompt() 
 
         # generate meta info dict
         if isinstance(self.ee, Suction):

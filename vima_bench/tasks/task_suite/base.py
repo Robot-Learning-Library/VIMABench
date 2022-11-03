@@ -445,32 +445,37 @@ class BaseTask:
         """
         return
 
-    def generate_prompt(self, *args, **kwargs) -> Any:
+    def generate_prompt(self, specify_prompt=None, *args, **kwargs) -> Any:
         """
         Generate prompt from `self.prompt_template`, 'self.task_meta', and `self.placeholders`.
         This method may be invoked in `env.reset()`.
         Implementation of this method may vary in different tasks.
         """
-        expressions = {}
-        # for each placeholder items, generate required expressions
-        for name, placeholder in self.placeholders.items():
-            args = self.placeholder_expression[name]
-            expressions[name] = placeholder.get_expression(**args)
-        # now assemble the prompt
-        prompt = deepcopy(self.prompt_template)
-        assets = {}
-        for name in self.placeholders:
-            replacement = ""
-            for expression_type in self.placeholder_expression[name]["types"]:
-                if expression_type == "image":
-                    replacement = replacement + "{" + name + "} "
-                    assets[name] = expressions[name]["image"]
-                else:
-                    # text expression, e.g., name, novel_name, alias, etc
-                    replacement = replacement + expressions[name][expression_type] + " "
-            # stripe the last white space
-            replacement = replacement[:-1]
-            prompt = prompt.replace("{" + f"{name}" + "}", replacement)
+        if specify_prompt is not None:
+            assets = {}  # if all objectes are specified by names
+            prompt = specify_prompt
+        else:
+            expressions = {}
+            # for each placeholder items, generate required expressions
+            for name, placeholder in self.placeholders.items():
+                args = self.placeholder_expression[name]
+                expressions[name] = placeholder.get_expression(**args)
+            # now assemble the prompt
+            prompt = deepcopy(self.prompt_template)
+            assets = {}
+            for name in self.placeholders:
+                replacement = ""
+                for expression_type in self.placeholder_expression[name]["types"]:
+                    if expression_type == "image":
+                        replacement = replacement + "{" + name + "} "
+                        assets[name] = expressions[name]["image"]
+                    else:
+                        # text expression, e.g., name, novel_name, alias, etc
+                        replacement = replacement + expressions[name][expression_type] + " "
+                # stripe the last white space
+                replacement = replacement[:-1]
+                prompt = prompt.replace("{" + f"{name}" + "}", replacement)
+
         return prompt, assets
 
     def is_match(self, pose0, pose1, symmetry, position_only=False):
