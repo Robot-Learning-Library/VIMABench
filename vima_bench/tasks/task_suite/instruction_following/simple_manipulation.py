@@ -235,7 +235,6 @@ class SimpleManipulation(BaseTask):
         base_poses = []
         not_reach_max_times = False
         for i in range(self.REJECT_SAMPLING_MAX_TIMES):
-            # sampled_base_obj = ObjPedia.BLOCK
             sampled_base_obj = self.rng.choice(self.possible_base_obj).value
             base_size = self.rng.uniform(
                 low=sampled_base_obj.size_range.low,
