@@ -138,7 +138,6 @@ class SceneUnderstanding(BaseTask):
                 ObjPedia.lookup_object_by_name(possible_dragged_obj)
             ]
         elif isinstance(possible_dragged_obj, ObjEntry):
-            print(possible_dragged_obj)
             self.possible_dragged_obj = [possible_dragged_obj]
         elif isinstance(possible_dragged_obj, list):
             if isinstance(possible_dragged_obj[0], str):
