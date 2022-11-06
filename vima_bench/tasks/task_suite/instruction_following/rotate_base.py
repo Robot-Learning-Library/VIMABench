@@ -41,6 +41,11 @@ class RotateTheObjBase(BaseTask, ABC):
         | TextureEntry
         | list[TextureEntry]
         | None = None,
+        possible_distractor_obj_texture: str
+        | list[str]
+        | TextureEntry
+        | list[TextureEntry]
+        | None = None,
         # ====== general ======
         obs_img_views: str | list[str] | None = None,
         obs_img_size: tuple[int, int] = (128, 256),
@@ -49,6 +54,7 @@ class RotateTheObjBase(BaseTask, ABC):
         debug: bool = False,
         is_subclassed_by_twist_task: bool = False,
     ):
+        self.possible_distractor_obj_texture = possible_distractor_obj_texture
         if possible_dragged_obj is None:
             self.possible_dragged_obj = ObjPedia.all_entries_no_rotational_symmetry()
         elif isinstance(possible_dragged_obj, str):
@@ -96,6 +102,31 @@ class RotateTheObjBase(BaseTask, ABC):
         else:
             raise ValueError(
                 "possible_dragged_obj_texture must be a str or list of str or TextureEntry"
+            )
+
+        if possible_distractor_obj_texture is None:
+            self.possible_distractor_obj_texture = self.possible_dragged_obj_texture
+        elif isinstance(possible_distractor_obj_texture, str):
+            self.possible_distractor_obj_texture = [
+                TexturePedia.lookup_color_by_name(possible_distractor_obj_texture)
+            ]
+        elif isinstance(possible_distractor_obj_texture, TextureEntry):
+            self.possible_distractor_obj_texture = [possible_distractor_obj_texture]
+        elif isinstance(possible_distractor_obj_texture, list):
+            if isinstance(possible_distractor_obj_texture[0], str):
+                self.possible_distractor_obj_texture = [
+                    TexturePedia.lookup_color_by_name(obj)
+                    for obj in possible_distractor_obj_texture
+                ]
+            elif isinstance(possible_distractor_obj_texture[0], TextureEntry):
+                self.possible_distractor_obj_texture = possible_distractor_obj_texture
+            else:
+                raise ValueError(
+                    "possible_distractor_obj_texture must be a list of str or TextureEntry"
+                )
+        else:
+            raise ValueError(
+                "possible_distractor_obj_texture must be a str or list of str or TextureEntry"
             )
 
         if possible_angles_of_rotation is None:
@@ -263,14 +294,24 @@ class RotateTheObjBase(BaseTask, ABC):
             self.task_meta["num_distractors"] + self.REJECT_SAMPLING_MAX_TIMES
         ):
             sampled_distractor_obj = self.rng.choice(self.possible_dragged_obj).value
-            sampled_distractor_obj_texture = self.rng.choice(
-                self.possible_dragged_obj_texture
-            ).value
-            # different from for dragged obj for simplicity
-            while sampled_distractor_obj_texture == self.sampled_dragged_obj_texture:
+            if self.possible_distractor_obj_texture is None:
                 sampled_distractor_obj_texture = self.rng.choice(
                     self.possible_dragged_obj_texture
                 ).value
+                # different from for dragged obj for simplicity
+                while sampled_distractor_obj_texture == self.sampled_dragged_obj_texture:
+                    sampled_distractor_obj_texture = self.rng.choice(
+                        self.possible_dragged_obj_texture
+                    ).value
+            else:  # if specified
+                sampled_distractor_obj_texture = self.rng.choice(
+                    self.possible_distractor_obj_texture
+                ).value
+                # different from for dragged obj for simplicity
+                while sampled_distractor_obj_texture == self.sampled_dragged_obj_texture:
+                    sampled_distractor_obj_texture = self.rng.choice(
+                        self.possible_distractor_obj_texture
+                    ).value                
             # check the validity of the samples
             is_valid_sample = True
             for dragged_entry in dragged_entries_archive:

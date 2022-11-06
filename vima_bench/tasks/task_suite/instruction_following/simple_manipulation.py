@@ -49,6 +49,11 @@ class SimpleManipulation(BaseTask):
         | TextureEntry
         | list[TextureEntry]
         | None = None,
+        possible_distractor_obj_texture: str
+        | list[str]
+        | TextureEntry
+        | list[TextureEntry]
+        | None = None,
         use_neutral_color: bool = False,
         exclude_distractor_by_geometry: bool = False,
         # ====== general ======
@@ -58,6 +63,7 @@ class SimpleManipulation(BaseTask):
         seed: int | None = None,
         debug: bool = False,
     ):
+        self.possible_distractor_obj_texture = possible_distractor_obj_texture
         task_meta = {
             "num_dragged_obj": num_dragged_obj,
             "num_base_obj": num_base_obj,
@@ -198,6 +204,32 @@ class SimpleManipulation(BaseTask):
         else:
             raise ValueError(
                 "possible_base_obj_texture must be a str or list of str or TextureEntry"
+            )
+
+
+        if possible_distractor_obj_texture is None:
+            self.possible_distractor_obj_texture = self.possible_dragged_obj_texture
+        elif isinstance(possible_distractor_obj_texture, str):
+            self.possible_distractor_obj_texture = [
+                TexturePedia.lookup_color_by_name(possible_distractor_obj_texture)
+            ]
+        elif isinstance(possible_distractor_obj_texture, TextureEntry):
+            self.possible_distractor_obj_texture = [possible_distractor_obj_texture]
+        elif isinstance(possible_distractor_obj_texture, list):
+            if isinstance(possible_distractor_obj_texture[0], str):
+                self.possible_distractor_obj_texture = [
+                    TexturePedia.lookup_color_by_name(obj)
+                    for obj in possible_distractor_obj_texture
+                ]
+            elif isinstance(possible_distractor_obj_texture[0], TextureEntry):
+                self.possible_distractor_obj_texture = possible_distractor_obj_texture
+            else:
+                raise ValueError(
+                    "possible_distractor_obj_texture must be a list of str or TextureEntry"
+                )
+        else:
+            raise ValueError(
+                "possible_distractor_obj_texture must be a str or list of str or TextureEntry"
             )
 
         super().__init__(
@@ -357,9 +389,12 @@ class SimpleManipulation(BaseTask):
             return
 
         possible_distractor_obj = self.possible_dragged_obj + self.possible_base_obj
-        possible_distractor_texture = (
-            self.possible_dragged_obj_texture + self.possible_base_obj_texture
-        )
+        if self.possible_distractor_obj_texture is None:
+            possible_distractor_texture = (
+                self.possible_dragged_obj_texture + self.possible_base_obj_texture
+            )
+        else:  # if specified
+            possible_distractor_texture = self.possible_distractor_obj_texture
         _distracting_combos = [
             r
             for r in itertools.product(
