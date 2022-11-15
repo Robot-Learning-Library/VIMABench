@@ -54,6 +54,10 @@ class SimpleManipulation(BaseTask):
         | TextureEntry
         | list[TextureEntry]
         | None = None,
+        specified_dragged_obj: str | list[str] | ObjEntry | list[ObjEntry] | None = None,
+        specified_dragged_obj_texture: str | list[str] | TextureEntry | list[TextureEntry] | None = None,
+        specified_base_obj: str | list[str] | ObjEntry | list[ObjEntry] | None = None,
+        specified_base_obj_texture: str | list[str] | TextureEntry | list[TextureEntry] | None = None,
         use_neutral_color: bool = False,
         exclude_distractor_by_geometry: bool = False,
         # ====== general ======
@@ -63,6 +67,10 @@ class SimpleManipulation(BaseTask):
         seed: int | None = None,
         debug: bool = False,
     ):
+        self.specified_dragged_obj = specified_dragged_obj
+        self.specified_dragged_obj_texture = specified_dragged_obj_texture
+        self.specified_base_obj = specified_base_obj
+        self.specified_base_obj_texture = specified_base_obj_texture
         self.possible_distractor_obj_texture = possible_distractor_obj_texture
         task_meta = {
             "num_dragged_obj": num_dragged_obj,
@@ -267,15 +275,26 @@ class SimpleManipulation(BaseTask):
         base_poses = []
         not_reach_max_times = False
         for i in range(self.REJECT_SAMPLING_MAX_TIMES):
-            sampled_base_obj = self.rng.choice(self.possible_base_obj).value
+            if self.specified_base_obj is not None:
+                obj_name = self.specified_base_obj.pop(0)
+                assert isinstance(obj_name, str)  # specified by name
+                sampled_base_obj = ObjPedia.lookup_object_by_name(obj_name).value
+            else:
+                sampled_base_obj = self.rng.choice(self.possible_base_obj).value
             base_size = self.rng.uniform(
                 low=sampled_base_obj.size_range.low,
                 high=sampled_base_obj.size_range.high,
             )
+            if self.specified_base_obj_texture is not None:
+                color_name = self.specified_base_obj_texture.pop(0)
+                assert isinstance(color_name, str)  # specified by name
+                base_obj_color = TexturePedia.lookup_color_by_name(color_name).value
+            else:
+                base_obj_color = sampled_colors[0]
             obj_id, urdf_full_path, pose = self.add_object_to_env(
                 env=env,
                 obj_entry=sampled_base_obj,
-                color=sampled_colors[0],
+                color=base_obj_color,
                 size=base_size,
                 category="fixed",
                 retain_temp=True,
@@ -289,7 +308,7 @@ class SimpleManipulation(BaseTask):
                     urdf=urdf_full_path,
                     novel_name=sampled_base_obj.novel_name,
                     alias=sampled_base_obj.alias,
-                    color=sampled_colors[0],
+                    color=base_obj_color,
                     image_size=self._placeholder_img_size,
                     seed=self.seed,
                     use_neutral_color=self._use_neutral_color,
@@ -309,7 +328,12 @@ class SimpleManipulation(BaseTask):
         not_reach_max_times = False
         n_added_dragged_obj = 0
         for i in range(self.REJECT_SAMPLING_MAX_TIMES):
-            sampled_dragged_obj = self.rng.choice(self.possible_dragged_obj).value
+            if self.specified_dragged_obj is not None:
+                obj_name = self.specified_dragged_obj.pop(0)
+                assert isinstance(obj_name, str)  # specified by name
+                sampled_dragged_obj = ObjPedia.lookup_object_by_name(obj_name).value
+            else:
+                sampled_dragged_obj = self.rng.choice(self.possible_dragged_obj).value
             dragged_size = self.rng.uniform(
                 low=sampled_dragged_obj.size_range.low,
                 high=sampled_dragged_obj.size_range.high,
@@ -331,10 +355,17 @@ class SimpleManipulation(BaseTask):
                     f"Warning: {i + 1} repeated sampling when try to spawn dragged object"
                 )
                 continue
+
+            if self.specified_dragged_obj_texture is not None:
+                color_name = self.specified_dragged_obj_texture.pop(0)
+                assert isinstance(color_name, str)  # specified by name
+                dragged_obj_color = TexturePedia.lookup_color_by_name(color_name).value
+            else:
+                dragged_obj_color = sampled_colors[1][n_added_dragged_obj]
             obj_id, urdf_full_path, _ = self.add_object_to_env(
                 env=env,
                 obj_entry=sampled_dragged_obj,
-                color=sampled_colors[1][n_added_dragged_obj],
+                color=dragged_obj_color,
                 size=dragged_size,
                 pose=dragged_pose,
                 retain_temp=True,
@@ -351,7 +382,7 @@ class SimpleManipulation(BaseTask):
                     urdf=urdf_full_path,
                     novel_name=sampled_dragged_obj.novel_name,
                     alias=sampled_dragged_obj.alias,
-                    color=sampled_colors[1][n_added_dragged_obj],
+                    color=dragged_obj_color,
                     image_size=self._placeholder_img_size,
                     seed=self.seed,
                     use_neutral_color=self._use_neutral_color,
@@ -525,6 +556,7 @@ class SimpleManipulation(BaseTask):
                     return ResultTuple(
                         success=False, failure=True, distance=self.pos_eps
                     )
+        print(len(self.goals))
         if all_achieved:
             # when the goal is achieved, the distance is simply the threshold
             return ResultTuple(success=True, failure=False, distance=self.pos_eps)

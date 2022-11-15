@@ -249,147 +249,148 @@ class VIMAEnvBase(gym.Env):
         self.prompt = prompt
         self.prompt_assets = assets
 
-    def reset(self, prompt=None, workspace_only=False):
+    def reset(self, prompt=None, keep_scene=False, workspace_only=False):
         """Performs common reset functionality for all supported tasks."""
-        if not self.task:
-            raise ValueError(
-                "environment task must be set. Call set_task or pass "
-                "the task arg in the environment constructor."
-            )
-        self.obj_ids = {"fixed": [], "rigid": []}
-        self.obj_id_reverse_mapping = {}
-        self.meta_info = {}
-        self.step_counter = 0
-        p.resetSimulation(physicsClientId=self.client_id)
-        p.setGravity(0, 0, -9.8, physicsClientId=self.client_id)
+        if not keep_scene:
+            if not self.task:
+                raise ValueError(
+                    "environment task must be set. Call set_task or pass "
+                    "the task arg in the environment constructor."
+                )
+            self.obj_ids = {"fixed": [], "rigid": []}
+            self.obj_id_reverse_mapping = {}
+            self.meta_info = {}
+            self.step_counter = 0
+            p.resetSimulation(physicsClientId=self.client_id)
+            p.setGravity(0, 0, -9.8, physicsClientId=self.client_id)
 
-        # Temporarily disable rendering to load scene faster.
-        if self._display_debug_window:
-            p.configureDebugVisualizer(
-                p.COV_ENABLE_RENDERING, 0, physicsClientId=self.client_id
-            )
+            # Temporarily disable rendering to load scene faster.
+            if self._display_debug_window:
+                p.configureDebugVisualizer(
+                    p.COV_ENABLE_RENDERING, 0, physicsClientId=self.client_id
+                )
 
-        pybullet_utils.load_urdf(
-            p,
-            os.path.join(self.assets_root, PLANE_URDF_PATH),
-            [0, 0, -0.001],
-            physicsClientId=self.client_id,
-        )
-
-        pybullet_utils.load_urdf(
-            p,
-            os.path.join(self.assets_root, UR5_WORKSPACE_URDF_PATH),
-            [0.5, 0, 0],
-            physicsClientId=self.client_id,
-        )
-
-        # Load UR5 robot arm equipped with suction end effector.
-        self.ur5 = pybullet_utils.load_urdf(
-            p,
-            os.path.join(self.assets_root, UR5_URDF_PATH),
-            physicsClientId=self.client_id,
-        )
-        if self._hide_arm_rgb:
-            pybullet_utils.set_visibility_bullet(
-                self.client_id, self.ur5, pybullet_utils.INVISIBLE_ALPHA
-            )
-        self.ee = self.task.ee(
-            self.assets_root,
-            self.ur5,
-            9,
-            self.obj_ids,
-            self.client_id,
-        )
-        self.ee.is_visible = not self._hide_arm_rgb
-        self.ee_tip = 10  # Link ID of suction cup.
-
-        # Get revolute joint indices of robot (skip fixed joints).
-        n_joints = p.getNumJoints(self.ur5, physicsClientId=self.client_id)
-        joints = [
-            p.getJointInfo(self.ur5, i, physicsClientId=self.client_id)
-            for i in range(n_joints)
-        ]
-        self.joints = [j[0] for j in joints if j[2] == p.JOINT_REVOLUTE]
-
-        # Move robot to home joint configuration.
-        for i in range(len(self.joints)):
-            p.resetJointState(
-                self.ur5, self.joints[i], self.homej[i], physicsClientId=self.client_id
+            pybullet_utils.load_urdf(
+                p,
+                os.path.join(self.assets_root, PLANE_URDF_PATH),
+                [0, 0, -0.001],
+                physicsClientId=self.client_id,
             )
 
-        # Reset end effector.
-        self.ee.release()
-
-        # Reset task.
-        if not workspace_only:
-            self.task.reset(self)
-
-        # Re-enable rendering.
-        if self._display_debug_window:
-            p.configureDebugVisualizer(
-                p.COV_ENABLE_RENDERING, 1, physicsClientId=self.client_id
+            pybullet_utils.load_urdf(
+                p,
+                os.path.join(self.assets_root, UR5_WORKSPACE_URDF_PATH),
+                [0.5, 0, 0],
+                physicsClientId=self.client_id,
             )
+
+            # Load UR5 robot arm equipped with suction end effector.
+            self.ur5 = pybullet_utils.load_urdf(
+                p,
+                os.path.join(self.assets_root, UR5_URDF_PATH),
+                physicsClientId=self.client_id,
+            )
+            if self._hide_arm_rgb:
+                pybullet_utils.set_visibility_bullet(
+                    self.client_id, self.ur5, pybullet_utils.INVISIBLE_ALPHA
+                )
+            self.ee = self.task.ee(
+                self.assets_root,
+                self.ur5,
+                9,
+                self.obj_ids,
+                self.client_id,
+            )
+            self.ee.is_visible = not self._hide_arm_rgb
+            self.ee_tip = 10  # Link ID of suction cup.
+
+            # Get revolute joint indices of robot (skip fixed joints).
+            n_joints = p.getNumJoints(self.ur5, physicsClientId=self.client_id)
+            joints = [
+                p.getJointInfo(self.ur5, i, physicsClientId=self.client_id)
+                for i in range(n_joints)
+            ]
+            self.joints = [j[0] for j in joints if j[2] == p.JOINT_REVOLUTE]
+
+            # Move robot to home joint configuration.
+            for i in range(len(self.joints)):
+                p.resetJointState(
+                    self.ur5, self.joints[i], self.homej[i], physicsClientId=self.client_id
+                )
+
+            # Reset end effector.
+            self.ee.release()
+
+            # Reset task.
+            if not workspace_only:
+                self.task.reset(self)
+
+            # Re-enable rendering.
+            if self._display_debug_window:
+                p.configureDebugVisualizer(
+                    p.COV_ENABLE_RENDERING, 1, physicsClientId=self.client_id
+                )
+
+            # generate meta info dict
+            if isinstance(self.ee, Suction):
+                self.meta_info["end_effector_type"] = "suction"
+            elif isinstance(self.ee, Spatula):
+                self.meta_info["end_effector_type"] = "spatula"
+            else:
+                raise NotImplementedError()
+            self.meta_info["n_objects"] = sum(len(v) for v in self.obj_ids.values())
+            self.meta_info["difficulty"] = self.task.difficulty_level or "easy"
+            self.meta_info["views"] = list(self.agent_cams.keys())
+            self.meta_info["modalities"] = self.modalities
+            self.meta_info["seed"] = self.task.seed
+            self.meta_info["action_bounds"] = {
+                "low": self.position_bounds.low,
+                "high": self.position_bounds.high,
+            }
+            self.meta_info["robot_components"] = (
+                [self.ur5, self.ee.base_uid, self.ee.body_uid]
+                if isinstance(self.ee, Suction)
+                else [self.ur5, self.ee.base_uid]
+            )
+            # check robot components are disjoint with object ids
+            assert set(self.meta_info["robot_components"]).isdisjoint(
+                set([x for v in self.obj_ids.values() for x in v])
+            )
+            # add reverse mapping dict that maps object_id in segmentation mask to object information.
+            # sanity check of mapping dict
+            assert len(self.obj_id_reverse_mapping) > 0, (
+                "Please add the mapping into the dict when reset new tasks"
+                "Use the method add_object_id_reverse_mapping_info in pybullet_utils.py, "
+                "which is similar to the add_any_object method."
+                "Hint: You could also refer to the novel_concept_grounding task as an example to see how to implement that"
+            )
+            # check the completeness of the mapping dict
+            assert all(
+                [
+                    (obj_id in self.obj_id_reverse_mapping)
+                    for each_catagory in self.obj_ids.values()
+                    for obj_id in each_catagory
+                ]
+            ), (
+                "Incomplete object_id mapping dict. "
+                "Please check whether there are missing objects that are not added into the dict"
+                f"Currently, we have {len(self.obj_id_reverse_mapping.keys())} in dict, but the total n_objects is {sum(len(v) for v in self.obj_ids.values())}"
+                f"[Debug Info] Matching Truth Table: {[(obj_id in self.obj_id_reverse_mapping) for each_catagory in self.obj_ids.values() for obj_id in each_catagory]}"
+                f"Mapping Dict {self.obj_id_reverse_mapping}"
+                f"Object IDs {self.obj_ids}"
+            )
+            # check ids from reverse map and ids from obj_ids are the same
+            ids_from_reverse_map = list(self.obj_id_reverse_mapping.keys())
+            ids_from_obj_ids = [x for v in self.obj_ids.values() for x in v]
+            assert set(ids_from_reverse_map) == set(ids_from_obj_ids)
+
+            self.meta_info["obj_id_to_info"] = self.obj_id_reverse_mapping
 
         # generate prompt and corresponding assets
         if prompt is not None:  # specify a given prompt
             self.prompt, self.prompt_assets = self.task.generate_prompt(prompt)
         else:  # randomly generate prompt in task
             self.prompt, self.prompt_assets = self.task.generate_prompt() 
-
-        # generate meta info dict
-        if isinstance(self.ee, Suction):
-            self.meta_info["end_effector_type"] = "suction"
-        elif isinstance(self.ee, Spatula):
-            self.meta_info["end_effector_type"] = "spatula"
-        else:
-            raise NotImplementedError()
-        self.meta_info["n_objects"] = sum(len(v) for v in self.obj_ids.values())
-        self.meta_info["difficulty"] = self.task.difficulty_level or "easy"
-        self.meta_info["views"] = list(self.agent_cams.keys())
-        self.meta_info["modalities"] = self.modalities
-        self.meta_info["seed"] = self.task.seed
-        self.meta_info["action_bounds"] = {
-            "low": self.position_bounds.low,
-            "high": self.position_bounds.high,
-        }
-        self.meta_info["robot_components"] = (
-            [self.ur5, self.ee.base_uid, self.ee.body_uid]
-            if isinstance(self.ee, Suction)
-            else [self.ur5, self.ee.base_uid]
-        )
-        # check robot components are disjoint with object ids
-        assert set(self.meta_info["robot_components"]).isdisjoint(
-            set([x for v in self.obj_ids.values() for x in v])
-        )
-        # add reverse mapping dict that maps object_id in segmentation mask to object information.
-        # sanity check of mapping dict
-        assert len(self.obj_id_reverse_mapping) > 0, (
-            "Please add the mapping into the dict when reset new tasks"
-            "Use the method add_object_id_reverse_mapping_info in pybullet_utils.py, "
-            "which is similar to the add_any_object method."
-            "Hint: You could also refer to the novel_concept_grounding task as an example to see how to implement that"
-        )
-        # check the completeness of the mapping dict
-        assert all(
-            [
-                (obj_id in self.obj_id_reverse_mapping)
-                for each_catagory in self.obj_ids.values()
-                for obj_id in each_catagory
-            ]
-        ), (
-            "Incomplete object_id mapping dict. "
-            "Please check whether there are missing objects that are not added into the dict"
-            f"Currently, we have {len(self.obj_id_reverse_mapping.keys())} in dict, but the total n_objects is {sum(len(v) for v in self.obj_ids.values())}"
-            f"[Debug Info] Matching Truth Table: {[(obj_id in self.obj_id_reverse_mapping) for each_catagory in self.obj_ids.values() for obj_id in each_catagory]}"
-            f"Mapping Dict {self.obj_id_reverse_mapping}"
-            f"Object IDs {self.obj_ids}"
-        )
-        # check ids from reverse map and ids from obj_ids are the same
-        ids_from_reverse_map = list(self.obj_id_reverse_mapping.keys())
-        ids_from_obj_ids = [x for v in self.obj_ids.values() for x in v]
-        assert set(ids_from_reverse_map) == set(ids_from_obj_ids)
-
-        self.meta_info["obj_id_to_info"] = self.obj_id_reverse_mapping
 
         obs, _, _, _ = self.step()
 
