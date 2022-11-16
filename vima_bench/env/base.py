@@ -249,7 +249,7 @@ class VIMAEnvBase(gym.Env):
         self.prompt = prompt
         self.prompt_assets = assets
 
-    def reset(self, prompt=None, keep_scene=False, workspace_only=False):
+    def reset(self, prompt=None, keep_scene=False, task_type=None, workspace_only=False):
         """Performs common reset functionality for all supported tasks."""
         if not keep_scene:
             if not self.task:
@@ -386,6 +386,8 @@ class VIMAEnvBase(gym.Env):
 
             self.meta_info["obj_id_to_info"] = self.obj_id_reverse_mapping
 
+        self.task.reset_subgoal(task_type)  # added for multi-stage task
+
         # generate prompt and corresponding assets
         if prompt is not None:  # specify a given prompt
             self.prompt, self.prompt_assets = self.task.generate_prompt(prompt)
@@ -398,11 +400,9 @@ class VIMAEnvBase(gym.Env):
 
     def step(self, action=None, skip_oracle=True):
         """Execute action with specified primitive.
-
         Args:
           action: action to execute.
           skip_oracle: boolean variable that indicates whether to update oracle-only goals
-
         Returns:
           (obs, reward, done, info) tuple containing MDP step data.
         """
@@ -567,7 +567,6 @@ class VIMAEnvBase(gym.Env):
         """Execute oracle action.
         Note that the original "Pick and Place" primitive can be divided into
         several sub-actions using "Move End Effector" primitive.
-
         Args:
           oracle_action: action to execute.
         """

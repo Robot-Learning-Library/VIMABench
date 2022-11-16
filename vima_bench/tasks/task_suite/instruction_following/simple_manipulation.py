@@ -256,10 +256,58 @@ class SimpleManipulation(BaseTask):
         self._use_neutral_color = use_neutral_color
         self._exclude_distractor_by_geometry = exclude_distractor_by_geometry
 
+    def reset_subgoal(self, type=None):
+        # modified goal: one dragged a time
+        if type is None or type in ['rotate']:
+            pass
+        else:
+            print('type: ', type)
+            self.goals = []
+            if type == 'stack': # one goal for one drag to one base; last drag as current base
+
+                dragged_obj = self.dragged_objs[self.sub_goal_cnt]
+                if self.sub_goal_cnt == 0:
+                    base_pose = self.base_poses[0] # the first base is specified
+                else:
+                    object_id, (symmetry, _) = self.dragged_objs[self.sub_goal_cnt-1]  # last drag as current base; function in BaseTask
+                    base_pose = p.getBasePositionAndOrientation(
+                    object_id, physicsClientId=self.client_id
+                )    
+
+                self.goals.append(
+                    (
+                        [dragged_obj],
+                        np.ones((1, 1)),
+                        [base_pose],
+                        False,
+                        True,
+                        "pose",
+                        None,
+                        1 / 1,
+                    )
+                )
+            elif type == 'put': # one goal for one obj to common base
+                dragged_obj = self.dragged_objs[self.sub_goal_cnt]
+                self.goals.append(
+                                (
+                                    [dragged_obj],
+                                    np.ones((1, 1)),
+                                    self.base_poses,
+                                    False,
+                                    True,
+                                    "pose",
+                                    None,
+                                    1 / 1,
+                                )
+                            )
+
+            self._all_goals = self.goals.copy()      
+            self.sub_goal_cnt += 1  
+
     def reset(self, env):
         self._reset_prompt()
         super().reset(env)
-
+        self.sub_goal_cnt = 0
         sampled_colors = [
             self.rng.choice(self.possible_base_obj_texture).value,
             [
@@ -272,7 +320,7 @@ class SimpleManipulation(BaseTask):
         ]
 
         # add base objects
-        base_poses = []
+        self.base_poses = []
         not_reach_max_times = False
         for i in range(self.REJECT_SAMPLING_MAX_TIMES):
             if self.specified_base_obj is not None:
@@ -300,7 +348,7 @@ class SimpleManipulation(BaseTask):
                 retain_temp=True,
             )
             if obj_id is not None:
-                base_poses.append(pose)
+                self.base_poses.append(pose)
                 # add placeholder objects
                 self.placeholders["base_obj"] = PlaceholderObj(
                     name=sampled_base_obj.name,
@@ -324,7 +372,7 @@ class SimpleManipulation(BaseTask):
 
         # add dragged objects
         dragged_poses = []
-        dragged = []
+        self.dragged_objs = []
         not_reach_max_times = False
         n_added_dragged_obj = 0
         for i in range(self.REJECT_SAMPLING_MAX_TIMES):
@@ -349,7 +397,7 @@ class SimpleManipulation(BaseTask):
                 ObjPedia.FRAME.value,
                 ObjPedia.SQUARE.value,
             ] and if_in_hollow_object(
-                [dragged_pose], dragged_size, base_poses, base_size
+                [dragged_pose], dragged_size, self.base_poses, base_size
             ):
                 print(
                     f"Warning: {i + 1} repeated sampling when try to spawn dragged object"
@@ -372,7 +420,7 @@ class SimpleManipulation(BaseTask):
             )
             if obj_id is not None:
                 dragged_poses.append(dragged_pose)
-                dragged.append((obj_id, (0, None)))
+                self.dragged_objs.append((obj_id, (0, None)))
                 # add placeholder objects
                 self.placeholders[
                     f"dragged_obj_{n_added_dragged_obj + 1}"
@@ -400,12 +448,12 @@ class SimpleManipulation(BaseTask):
             raise ValueError("Error in sampling dragged object")
 
         # set goal
-        for dragged_obj in dragged:
+        for dragged_obj in self.dragged_objs:
             self.goals.append(
                 (
                     [dragged_obj],
                     np.ones((1, 1)),
-                    base_poses,
+                    self.base_poses,
                     False,
                     True,
                     "pose",
@@ -508,7 +556,7 @@ class SimpleManipulation(BaseTask):
                     ObjPedia.FRAME.value,
                     ObjPedia.SQUARE.value,
                 ] and if_in_hollow_object(
-                    [distractor_pose], distractor_size, base_poses, base_size
+                    [distractor_pose], distractor_size, self.base_poses, base_size
                 ):
                     print(
                         f"Warning: {i + 1} repeated sampling when try to spawn distractors"

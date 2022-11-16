@@ -123,6 +123,9 @@ class BaseTask:
         # for checking whether the distractors at goals
         self._all_goals = None
         self.distractors = None
+    
+    def reset_subgoal(self, type=None):  # added; reset_subgoal is the type of resetting
+        pass
 
     def set_difficulty(self, difficulty: str):
         """
