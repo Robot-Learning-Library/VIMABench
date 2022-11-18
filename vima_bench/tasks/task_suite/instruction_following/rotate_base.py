@@ -35,6 +35,7 @@ class RotateTheObjBase(BaseTask, ABC):
         oracle_max_steps: int = 2,  # one mistake is allowed
         oracle_step_to_env_step_ratio: int = 4,
         possible_angles_of_rotation: list[float | int] | float | int | None = None,
+        specified_angles_of_rotation: list[float | int] | float | int | None = None,
         possible_dragged_obj: str | list[str] | ObjEntry | list[ObjEntry] | None = None,
         possible_dragged_obj_texture: str
         | list[str]
@@ -55,6 +56,7 @@ class RotateTheObjBase(BaseTask, ABC):
         is_subclassed_by_twist_task: bool = False,
     ):
         self.possible_distractor_obj_texture = possible_distractor_obj_texture
+        self.specified_angles_of_rotation = specified_angles_of_rotation
         if possible_dragged_obj is None:
             self.possible_dragged_obj = ObjPedia.all_entries_no_rotational_symmetry()
         elif isinstance(possible_dragged_obj, str):
@@ -177,17 +179,48 @@ class RotateTheObjBase(BaseTask, ABC):
             self.possible_dragged_obj_texture
         ).value
 
+    def reset_subgoal(self, type=None):
+        if type == 'rotate':
+            target_angle = self.specified_angles_of_rotation[self.sub_goal_cnt] / 57.3 #  degree to radian
+            for dragged_obj, dragged_pose in zip(self.dragged_objs, self.dragged_poses):
+                dragged_obj_euler = quatXYZW_to_eulerXYZ(dragged_pose[1])
+                #  rotate direction as clockwise
+                target_rot_quat = eulerXYZ_to_quatXYZW(
+                    (
+                        *dragged_obj_euler[:2],
+                        dragged_obj_euler[2] - target_angle,
+                    )
+                )
+
+                target_pose = dragged_pose[0], target_rot_quat
+                self.goals.append(
+                    (
+                        [dragged_obj],
+                        np.ones((1, 1)),
+                        [target_pose],
+                        False,
+                        True,
+                        "pose",
+                        None,
+                        1,
+                    )
+                )
+        self._all_goals = self.goals.copy()
+        self.sub_goal_cnt += 1
+        print('goal: ', self.goals, target_angle)
+
     def reset(
         self, env, same_dragged_obj: bool = True, same_dragged_color: bool = True
     ):
         super().reset(env)
+        self.sub_goal_cnt = 0
         self._reset_prompt(same_dragged_obj)
 
         # add dragged obj
         not_reach_max_times = False
         num_added_dragged_obj = 0
-        dragged = []
-        dragged_poses = []
+        self.dragged_objs = []
+        self.dragged_poses = []
         dragged_entries_archive = []
         for i in range(
             self.task_meta["num_dragged_obj"] + self.REJECT_SAMPLING_MAX_TIMES
@@ -228,8 +261,8 @@ class RotateTheObjBase(BaseTask, ABC):
                     )
                     break
                 else:
-                    dragged.append((obj_id, (sampled_dragged_obj.symmetry, None)))
-                    dragged_poses.append(pose)
+                    self.dragged_objs.append((obj_id, (sampled_dragged_obj.symmetry, None)))
+                    self.dragged_poses.append(pose)
                     dragged_entries_archive.append(
                         (sampled_dragged_obj, self.sampled_dragged_obj_texture, urdf)
                     )
@@ -260,7 +293,7 @@ class RotateTheObjBase(BaseTask, ABC):
             raise ValueError("Error in adding object to env.")
 
         # set goals
-        for dragged_obj, dragged_pose in zip(dragged, dragged_poses):
+        for dragged_obj, dragged_pose in zip(self.dragged_objs, self.dragged_poses):
             dragged_obj_euler = quatXYZW_to_eulerXYZ(dragged_pose[1])
             #  rotate direction as clockwise
             target_rot_quat = eulerXYZ_to_quatXYZW(

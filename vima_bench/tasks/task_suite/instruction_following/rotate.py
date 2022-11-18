@@ -36,6 +36,7 @@ class Rotate(RotateTheObjBase):
         oracle_max_steps: int = 3,  # two mistakes are allowed
         oracle_step_to_env_step_ratio: int = 4,
         possible_angles_of_rotation: list[float | int] | float | int | None = None,
+        specified_angles_of_rotation: list[float | int] | float | int | None = None,
         possible_dragged_obj: str | list[str] | ObjEntry | list[ObjEntry] | None = None,
         possible_dragged_obj_texture: str
         | list[str]
@@ -101,6 +102,7 @@ class Rotate(RotateTheObjBase):
             oracle_max_steps=oracle_max_steps,
             oracle_step_to_env_step_ratio=oracle_step_to_env_step_ratio,
             possible_angles_of_rotation=possible_angles_of_rotation,
+            specified_angles_of_rotation=specified_angles_of_rotation,
             possible_dragged_obj=possible_dragged_obj,
             possible_dragged_obj_texture=possible_dragged_obj_texture,
             possible_distractor_obj_texture=possible_distractor_obj_texture,
