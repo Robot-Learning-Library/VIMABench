@@ -207,7 +207,6 @@ class RotateTheObjBase(BaseTask, ABC):
                 )
         self._all_goals = self.goals.copy()
         self.sub_goal_cnt += 1
-        print('goal: ', self.goals, target_angle)
 
     def reset(
         self, env, same_dragged_obj: bool = True, same_dragged_color: bool = True

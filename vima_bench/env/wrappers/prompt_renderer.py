@@ -77,6 +77,7 @@ class PromptRenderer(gym.Wrapper):
     def get_multi_modal_prompt_img(self):
         # make prompts
         prompt, prompt_assets = self.env.get_prompt_and_assets()
+        print(prompt)
 
         prompt_pieces = re.split(r"\{[^}]+\}", prompt)
         prompt_placeholders = re.findall(r"\{([^}]+)\}", prompt)
