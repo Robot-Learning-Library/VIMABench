@@ -456,10 +456,8 @@ class VIMAEnvBase(gym.Env):
             result_tuple = self.task.check_success()
         else:
             raise NotImplementedError()
-
         done = result_tuple.success or result_tuple.failure
         obs = self._get_obs()
-
         return obs, reward, done, self._get_info()
 
     def oracle_action_to_env_actions(self, oracle_action: dict):
