@@ -456,10 +456,8 @@ class VIMAEnvBase(gym.Env):
             result_tuple = self.task.check_success()
         else:
             raise NotImplementedError()
-
         done = result_tuple.success or result_tuple.failure
         obs = self._get_obs()
-
         return obs, reward, done, self._get_info()
 
     def oracle_action_to_env_actions(self, oracle_action: dict):
@@ -751,3 +749,30 @@ class VIMAEnvBase(gym.Env):
         joints = np.float32(joints)
         joints[2:] = (joints[2:] + np.pi) % (2 * np.pi) - np.pi
         return joints
+    
+    
+    def get_scene_description(self):
+        """Get scene description."""
+        description_list = []
+        
+        # Get number of objects in scene
+        # num_objects = p.getNumBodies(physicsClientId=self.client_id)
+        num_objects = len(self.obj_id_reverse_mapping)
+        description_list.append(f"There are {num_objects} objects in the scene. ")
+        
+        for obj_id, obj_dict in self.obj_id_reverse_mapping.items():
+            obj_name = obj_dict["obj_name"]
+            obj_appearance = obj_dict["texture_name"]
+            obj_fixed = "fixed" if obj_id in self.obj_ids['fixed'] else "movable"
+            xyz, _ = p.getBasePositionAndOrientation(
+                    obj_id, physicsClientId=self.client_id
+                )
+            xyz = np.round(xyz, 3)
+            description_list.append(
+                f"A {obj_fixed} {obj_name} with {obj_appearance} appearance is located at ({xyz[0]}, {xyz[1]}, {xyz[2]}) position. "
+                )
+        
+        full_description = ""
+        for d in description_list:
+            full_description += d
+        return full_description
