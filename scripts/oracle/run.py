@@ -20,13 +20,10 @@ def main(cfg):
         env.seed(seed)
 
         obs = env.reset()
+        print("\n", env.get_scene_description())
         env.render()
         prompt, prompt_assets = env.get_prompt_and_assets()
-        print("Prompt: ", prompt)
-        print("Prompt assets: ", prompt_assets)
-        print("Goal: ", task.goals)
-        plot_obs(obs)
-        
+            
         for _ in range(task.oracle_max_steps):
             oracle_action = oracle_fn.act(obs)
             # clamp action to valid range
@@ -34,8 +31,9 @@ def main(cfg):
                 k: np.clip(v, env.action_space[k].low, env.action_space[k].high)
                 for k, v in oracle_action.items()
             }
+            
             obs, reward, done, info = env.step(action=oracle_action, skip_oracle=False)
-            print(reward, done, info)
+            print("\n", env.get_scene_description())
             plot_obs(obs)
             if done:
                 break
